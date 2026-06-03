@@ -82,6 +82,22 @@ Best when you do not maintain a clone of this repository and prefer to drop a ve
 
 Version tracking and update notifications are entirely manual with this method. No CI deploy key is required.
 
+## Required dependencies
+
+The SDK is distributed as a standalone AAR. Because AAR plus `flatDir` does not resolve transitive dependencies the way Maven coordinates do, your app must declare the libraries the SDK depends on explicitly. Add these to your app module's `dependencies { }` block alongside the SDK reference:
+
+```kotlin
+// Required transitive dependencies of InsurelySDK
+implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+implementation("io.ktor:ktor-client-core:2.3.10")
+implementation("io.ktor:ktor-client-cio:2.3.10")
+implementation("io.ktor:ktor-client-logging:2.3.10")
+implementation("io.ktor:ktor-client-content-negotiation:2.3.10")
+implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.10")
+```
+
+Pin the exact versions shown above for the SDK version you are integrating. Without these dependencies, the SDK compiles successfully but crashes at runtime with `NoClassDefFoundError` when the embedded `WebView` is first composed.
+
 ## Quickstart
 
 The SDK is reached through a Jetpack Compose composable, `InsurelyView`. A minimal integration:
