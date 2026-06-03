@@ -1,0 +1,14 @@
+## macOS
+.DS_Store
+
+## Android Studio / IntelliJ
+.idea/
+*.iml
+local.properties
+
+## Gradle
+.gradle/
+build/
+
+## Editor
+.vscode/
