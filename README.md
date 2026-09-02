@@ -8,13 +8,16 @@ The Insurely Android SDK lets you embed the Insurely user interface in your Andr
 - Jetpack Compose
 - Kotlin 1.9 or later
 
-Access to this repository is granted to authorized Insurely customers. Use of the SDK is governed by the terms of your agreement with Insurely AB. See `LICENSE` for details.
+Use of the SDK is governed by the terms of your agreement with Insurely AB. See `LICENSE` for details.
 
 ## Access
 
-This SDK is distributed via a private GitHub repository. Every developer who needs to install or update the SDK requires read access. Send the GitHub usernames of every developer who will integrate the SDK to your Insurely account representative, and we will grant each account read access to this repository.
+This repository is public. No access request, GitHub account, or credential is
+needed to install the SDK or to update it — from a developer machine or from
+CI.
 
-How long that access is needed depends on the installation method you choose — see [Installation](#installation) for the specific pattern each method uses.
+The SDK itself remains proprietary: it is published so you can install, inspect
+and audit it, under the terms of your agreement with Insurely AB. See `LICENSE`.
 
 ## Installation
 
@@ -26,7 +29,7 @@ Best when you want to vendor the SDK in your repository for reproducibility, bui
 
 1. Clone this repository to a stable location in or alongside your project:
    ```
-   git clone git@github.com:insurely/insurely-sdk-android-distribution.git
+   git clone https://github.com/insurely/insurely-sdk-android-distribution.git
    ```
 2. In your project's `settings.gradle.kts`, add the cloned directory as a `flatDir` repository:
    ```kotlin
@@ -53,7 +56,7 @@ Best when you want to vendor the SDK in your repository for reproducibility, bui
 
 To update, run `git pull` in the clone (or `git checkout <version-tag>` to pin to an exact version) and rebuild your app.
 
-No CI deploy key is required — the SDK is vendored alongside your own code, so CI never reaches out to this repository at build time.
+With this method CI never reaches out to this repository at build time, since the SDK is vendored alongside your own code.
 
 ### Direct AAR download
 
@@ -80,7 +83,7 @@ Best when you do not maintain a clone of this repository and prefer to drop a ve
    }
    ```
 
-Version tracking and update notifications are entirely manual with this method. No CI deploy key is required.
+Version tracking is entirely manual with this method — nothing tells you a new version exists, and nothing resolves one for you.
 
 ## Required dependencies
 
@@ -159,7 +162,25 @@ Dark mode rendering requires your `BlocksConfig` to include at least one `Connec
 
 The SDK follows [Semantic Versioning](https://semver.org/). Release notes for each version are published on the [Releases page](https://github.com/insurely/insurely-sdk-android-distribution/releases).
 
-For now, the SDK is distributed as a vendored AAR rather than via Maven coordinates. New releases require a manual pull of this repository (or a fresh download from the Releases page) to update your local copy.
+### Staying up to date
+
+The SDK is distributed as an AAR rather than via Maven coordinates, so Gradle
+does not resolve versions for it. Nothing tells your build that a new release
+exists, and nothing updates it for you — this is the one part of installing the
+SDK that is fully manual:
+
+| Installation | On a new release |
+| --- | --- |
+| Vendored clone | `git pull` in the clone, or `git checkout <version-tag>` for an exact version, then rebuild. |
+| Direct AAR download | Download the new `InsurelySDK-release.aar` from the Releases page and replace the file in your project. |
+
+To be told when a version ships, use **Watch → Custom → Releases** at the top of
+this repository. It is worth doing: without it there is no signal at all.
+
+Because the version is not expressed anywhere Gradle can see, it is also worth
+recording which version you vendored — a comment beside the `implementation`
+line, or the release tag in your commit message — so the AAR in your repository
+can be traced back to a release later.
 
 ## Support
 
