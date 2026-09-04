@@ -21,85 +21,69 @@ and audit it, under the terms of your agreement with Insurely AB. See `LICENSE`.
 
 ## Installation
 
-The SDK can be installed two ways. Both produce an identical AAR in your app — they differ only in how the framework reaches your project. Pick the one that fits your team's environment.
-
-### Vendored clone (recommended)
-
-Best when you want to vendor the SDK in your repository for reproducibility, build in air-gapped CI, or pin to a specific commit. This is also the simplest path if you already have a working multi-module Gradle build.
-
-1. Clone this repository to a stable location in or alongside your project:
-   ```
-   git clone https://github.com/insurely/insurely-sdk-android-distribution.git
-   ```
-2. In your project's `settings.gradle.kts`, add the cloned directory as a `flatDir` repository:
-   ```kotlin
-   dependencyResolutionManagement {
-       repositories {
-           google()
-           mavenCentral()
-           flatDir {
-               dirs("path/to/insurely-sdk-android-distribution")
-           }
-       }
-   }
-   ```
-3. In your app module's `build.gradle.kts`, reference the AAR:
-   ```kotlin
-   dependencies {
-       implementation(files("path/to/insurely-sdk-android-distribution/InsurelySDK-release.aar"))
-       // Or, if you want a separate debug build:
-       // debugImplementation(files("path/to/insurely-sdk-android-distribution/InsurelySDK-debug.aar"))
-       // releaseImplementation(files("path/to/insurely-sdk-android-distribution/InsurelySDK-release.aar"))
-   }
-   ```
-4. Sync Gradle. The SDK is available under `import com.insurely.blocks.sdk.*`.
-
-To update, run `git pull` in the clone (or `git checkout <version-tag>` to pin to an exact version) and rebuild your app.
-
-With this method CI never reaches out to this repository at build time, since the SDK is vendored alongside your own code.
-
-### Direct AAR download
-
-Best when you do not maintain a clone of this repository and prefer to drop a versioned binary into your project directly.
-
-1. Download `InsurelySDK-release.aar` (and optionally `InsurelySDK-debug.aar`) from the [latest GitHub Release](https://github.com/insurely/insurely-sdk-android-distribution/releases).
-2. Place the AAR(s) into your app module's `libs/` directory.
-3. In your project's `settings.gradle.kts`, add a `flatDir` repository pointing at `libs/`:
-   ```kotlin
-   dependencyResolutionManagement {
-       repositories {
-           google()
-           mavenCentral()
-           flatDir {
-               dirs("libs")
-           }
-       }
-   }
-   ```
-4. In your app module's `build.gradle.kts`:
-   ```kotlin
-   dependencies {
-       implementation(files("libs/InsurelySDK-release.aar"))
-   }
-   ```
-
-Version tracking is entirely manual with this method — nothing tells you a new version exists, and nothing resolves one for you.
-
-## Required dependencies
-
-The SDK is distributed as a standalone AAR. Because AAR plus `flatDir` does not resolve transitive dependencies the way Maven coordinates do, your app must declare the libraries the SDK depends on explicitly. Add these to your app module's `dependencies { }` block alongside the SDK reference:
-
 ```kotlin
-// Required transitive dependencies of InsurelySDK
-implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
-implementation("io.ktor:ktor-client-core:2.3.10")
-implementation("io.ktor:ktor-client-cio:2.3.10")
-implementation("io.ktor:ktor-client-logging:2.3.10")
-implementation("io.ktor:ktor-client-content-negotiation:2.3.10")
-implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.10")
+dependencies {
+    implementation("com.insurely:insurely-android-sdk:1.2.2")
+}
 ```
 
-Pin the exact versions shown above for the SDK version you are integrating. Without these dependencies, the SDK compiles successfully but crashes at runtime with `NoClassDefFoundError` when the embedded `WebView` is first composed.
+That is the whole installation. `mavenCentral()` is already in most projects'
+repository list; if it is not, add it in `settings.gradle.kts`:
+
+```kotlin
+dependencyResolutionManagement {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+```
+
+Sync Gradle. The SDK is available under `import com.insurely.blocks.sdk.*`.
+
+Gradle resolves the SDK's own dependencies from its POM, so there is nothing
+else to declare — see [Upgrading from the AAR](#upgrading-from-the-aar) if you
+integrated before 1.2.2.
+
+### Air-gapped builds
+
+If your build cannot reach Maven Central, every release also attaches
+`InsurelySDK-release.aar` to its [GitHub Release](https://github.com/insurely/insurely-sdk-android-distribution/releases),
+and this repository holds the latest at the root.
+
+Consuming the AAR directly means Gradle resolves no transitive dependencies
+for it, so your app has to declare them itself:
+
+```kotlin
+dependencies {
+    implementation(files("path/to/InsurelySDK-release.aar"))
+
+    // Required only when consuming the AAR directly. The Maven coordinate
+    // above carries these for you.
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+    implementation("io.ktor:ktor-client-core:2.3.10")
+    implementation("io.ktor:ktor-client-cio:2.3.10")
+    implementation("io.ktor:ktor-client-logging:2.3.10")
+    implementation("io.ktor:ktor-client-content-negotiation:2.3.10")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.10")
+}
+```
+
+Pin the exact versions shown, for the SDK version you are integrating. Without
+them the SDK compiles successfully and then crashes at runtime with
+`NoClassDefFoundError` when the embedded `WebView` is first composed.
+
+## Upgrading from the AAR
+
+If you integrated before 1.2.2, switching to the Maven coordinate lets you
+delete three things:
+
+1. the vendored AAR or downloaded file, and any `flatDir` repository entry
+2. the `implementation(files("…"))` line
+3. **all six** hand-declared `ktor` and `kotlinx-serialization` dependencies —
+   the POM now carries them, at the same versions
+
+Nothing else changes. The binary is the same one you have today.
 
 ## Quickstart
 
@@ -160,27 +144,20 @@ Dark mode rendering requires your `BlocksConfig` to include at least one `Connec
 
 ## Versioning
 
-The SDK follows [Semantic Versioning](https://semver.org/). Release notes for each version are published on the [Releases page](https://github.com/insurely/insurely-sdk-android-distribution/releases).
+The SDK follows [Semantic Versioning](https://semver.org/). Release notes for
+each version are published on the
+[Releases page](https://github.com/insurely/insurely-sdk-android-distribution/releases).
 
 ### Staying up to date
 
-The SDK is distributed as an AAR rather than via Maven coordinates, so Gradle
-does not resolve versions for it. Nothing tells your build that a new release
-exists, and nothing updates it for you — this is the one part of installing the
-SDK that is fully manual:
+Since 1.2.2 the SDK is a normal Gradle dependency, so your existing tooling
+handles updates: version catalogs resolve it, and Dependabot or Renovate will
+open a pull request when a release ships. Nothing here needs watching.
 
-| Installation | On a new release |
-| --- | --- |
-| Vendored clone | `git pull` in the clone, or `git checkout <version-tag>` for an exact version, then rebuild. |
-| Direct AAR download | Download the new `InsurelySDK-release.aar` from the Releases page and replace the file in your project. |
-
-To be told when a version ships, use **Watch → Custom → Releases** at the top of
-this repository. It is worth doing: without it there is no signal at all.
-
-Because the version is not expressed anywhere Gradle can see, it is also worth
-recording which version you vendored — a comment beside the `implementation`
-line, or the release tag in your commit message — so the AAR in your repository
-can be traced back to a release later.
+If you consume the AAR directly, that does not apply — Gradle never learns a
+version exists. Download the new AAR from the Releases page and replace the
+file, and use **Watch → Custom → Releases** at the top of this repository so
+you hear about one.
 
 ## Support
 
