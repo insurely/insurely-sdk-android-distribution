@@ -47,9 +47,11 @@ integrated before 1.2.2.
 
 ### Air-gapped builds
 
-If your build cannot reach Maven Central, every release also attaches
-`InsurelySDK-release.aar` to its [GitHub Release](https://github.com/insurely/insurely-sdk-android-distribution/releases),
-and this repository holds the latest at the root.
+If your build cannot reach Maven Central, every release attaches
+`InsurelySDK-release.aar` to its [GitHub Release](https://github.com/insurely/insurely-sdk-android-distribution/releases).
+Download the one belonging to the version you want — each is the artifact
+published to Maven Central for that release, so it matches the coordinate
+exactly.
 
 Consuming the AAR directly means Gradle resolves no transitive dependencies
 for it, so your app has to declare them itself:
