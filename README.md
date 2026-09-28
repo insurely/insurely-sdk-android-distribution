@@ -23,7 +23,7 @@ and audit it, under the terms of your agreement with Insurely AB. See `LICENSE`.
 
 ```kotlin
 dependencies {
-    implementation("com.insurely:insurely-android-sdk:1.2.2")
+    implementation("com.insurely:insurely-android-sdk:1.3.0")
 }
 ```
 
@@ -143,6 +143,48 @@ InsurelyConfig(
 - Omitted (default `null`) — no preference is sent; blocks resolves the theme using its own defaults.
 
 Dark mode rendering requires your `BlocksConfig` to include at least one `ConnectedTheme`. With both `light` and `dark` identifiers configured server-side, passing `themeMode = InsurelyThemeMode.System` follows the device automatically. Contact your Insurely account representative if you need help setting up `ConnectedTheme` rows for your configuration.
+
+## Auth token
+
+Since 1.3.0, pass a JWT for authenticated API calls through the optional `authToken` parameter on `InsurelyConfig`, including the scheme:
+
+```kotlin
+InsurelyConfig(
+    customerId = "...",
+    configName = "...",
+    authToken = "Bearer abc.def.ghi",
+)
+```
+
+Unlike the other settings, `authToken` can change while `InsurelyView` is running. To refresh an expiring token, recompose the view with settings that carry the new one, and the SDK delivers it to the running module without reloading it:
+
+```kotlin
+var token by remember { mutableStateOf(initialToken) }
+
+InsurelyView(
+    settings = InsurelySettings(
+        environment = InsurelyEnvironment.Prod,
+        config = InsurelyConfig(
+            customerId = "your-customer-id",
+            configName = "your-config-name",
+            authToken = token,
+        ),
+    ),
+    onEventReceived = { event ->
+        if (event is InsurelyEvent.ValidAuthToken) {
+            // The module accepted the token.
+        }
+    },
+    onErrorReceived = { error ->
+        if (error is InsurelyError.InvalidAuthorizationToken) {
+            // The module rejected the token. Fetch a new one and assign it to `token`.
+        }
+    },
+    // ...
+)
+```
+
+A token that changes before the module has finished loading is held and delivered once it has loaded. Every other setting applies only when the view is created. The SDK never writes the token to Logcat.
 
 ## Versioning
 
