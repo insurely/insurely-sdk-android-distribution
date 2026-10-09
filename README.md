@@ -23,7 +23,7 @@ and audit it, under the terms of your agreement with Insurely AB. See `LICENSE`.
 
 ```kotlin
 dependencies {
-    implementation("com.insurely:insurely-android-sdk:1.3.0")
+    implementation("com.insurely:insurely-android-sdk:2.0.0")
 }
 ```
 
@@ -63,17 +63,17 @@ dependencies {
     // Required only when consuming the AAR directly. The Maven coordinate
     // above carries these for you.
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
-    implementation("io.ktor:ktor-client-core:2.3.10")
-    implementation("io.ktor:ktor-client-cio:2.3.10")
-    implementation("io.ktor:ktor-client-logging:2.3.10")
-    implementation("io.ktor:ktor-client-content-negotiation:2.3.10")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.10")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 }
 ```
 
-Pin the exact versions shown, for the SDK version you are integrating. Without
-them the SDK compiles successfully and then crashes at runtime with
-`NoClassDefFoundError` when the embedded `WebView` is first composed.
+Use the versions shown, for the SDK version you are integrating; if your app
+already uses OkHttp 4 or 5, your own version works too. Without these the SDK
+compiles successfully and then crashes at runtime with `NoClassDefFoundError`
+when the embedded `WebView` is first composed.
+
+Before 2.0.0 the SDK needed five `io.ktor` dependencies instead of OkHttp. Remove
+them when upgrading, unless your own code uses Ktor.
 
 ## Upgrading from the AAR
 
@@ -82,8 +82,9 @@ delete three things:
 
 1. the vendored AAR or downloaded file, and any `flatDir` repository entry
 2. the `implementation(files("…"))` line
-3. **all six** hand-declared `ktor` and `kotlinx-serialization` dependencies —
-   the POM now carries them, at the same versions
+3. the hand-declared `kotlinx-serialization`, `ktor` and `okhttp` dependencies —
+   the POM carries what the SDK needs (OkHttp rather than Ktor from 2.0.0).
+   Keep a line only if your own code uses that library
 
 Nothing else changes. The binary is the same one you have today.
 
