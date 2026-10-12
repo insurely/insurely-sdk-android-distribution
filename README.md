@@ -23,7 +23,7 @@ and audit it, under the terms of your agreement with Insurely AB. See `LICENSE`.
 
 ```kotlin
 dependencies {
-    implementation("com.insurely:insurely-android-sdk:2.0.0")
+    implementation("com.insurely:insurely-android-sdk:2.1.0")
 }
 ```
 
@@ -186,6 +186,20 @@ InsurelyView(
 ```
 
 A token that changes before the module has finished loading is held and delivered once it has loaded. Every other setting applies only when the view is created. The SDK never writes the token to Logcat.
+
+## Logging and debugging
+
+From 2.1.0 the SDK writes nothing to logcat unless you turn logging on. Do that in debug builds only:
+
+```kotlin
+if (BuildConfig.DEBUG) {
+    InsurelyLogging.isEnabled = true
+}
+```
+
+It then logs under the `InsurelySDK` tag what the SDK is doing, such as message names, request methods, hosts and status codes. It never logs header values, cookies, request or response bodies, collection results, tokens, URL paths or queries, or user data.
+
+The SDK does not turn on WebView debugging. To inspect the Insurely view through `chrome://inspect`, call `WebView.setWebContentsDebuggingEnabled(true)` yourself in debug builds. It applies to every WebView in your app.
 
 ## Versioning
 
