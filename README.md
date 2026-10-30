@@ -23,7 +23,7 @@ and audit it, under the terms of your agreement with Insurely AB. See `LICENSE`.
 
 ```kotlin
 dependencies {
-    implementation("com.insurely:insurely-android-sdk:2.1.1")
+    implementation("com.insurely:insurely-android-sdk:3.0.0")
 }
 ```
 
