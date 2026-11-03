@@ -7,7 +7,9 @@
 # the README. Its description is the release notes.
 #
 # While the PR is open, a check fails if the branch does not name a new
-# version, the README does not install it, or the description is empty.
+# version, the README does not install it, Maven Central does not serve it
+# yet, or the description is empty. Make the check required in the branch
+# rules, so a red one blocks the merge.
 #
 # On merge, this creates the release: the version as its tag, on the merge
 # commit, the PR description as its notes, and the AAR attached for builds
@@ -73,6 +75,20 @@ jobs:
         run: |
           if ! grep -q "insurely-android-sdk:$VERSION\"" README.md; then
             echo "::error::README.md does not install $VERSION. Update its implementation(...) line."
+            exit 1
+          fi
+
+      - name: Check Maven Central serves it
+        # Merging puts the README on main, telling customers to install this
+        # version, so it must exist first. After the merge, the release job
+        # waits for it instead: by then the PR can't be held back.
+        if: github.event.action != 'closed'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if ! curl -sfI "https://repo1.maven.org/maven2/com/insurely/insurely-android-sdk/$VERSION/" >/dev/null 2>&1; then
+            echo "::error::$VERSION is not on Maven Central yet, so the README would install a version that doesn't exist."
+            echo "::error::It appears about twenty minutes after the SDK repository publishes it. Re-run this check then."
             exit 1
           fi
 
