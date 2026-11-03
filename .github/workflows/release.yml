@@ -1,0 +1,173 @@
+# Creates the GitHub release for an SDK version when its release PR is merged.
+#
+# The SDK is published to Maven Central from the private SDK repository when a
+# version bump is merged there. This repository is where customers read about
+# it: the README they install from, and the releases they watch. So each
+# version gets a PR here, from a branch named release/<version>, that updates
+# the README. Its description is the release notes.
+#
+# While the PR is open, a check fails if the branch does not name a new
+# version, the README does not install it, Maven Central has not served it
+# within 30 minutes, or the description is empty. It waits for Maven Central,
+# so the PR can be opened as soon as the SDK repository has published. Make the check required in the branch
+# rules, so a red one blocks the merge.
+#
+# On merge, this creates the release: the version as its tag, on the merge
+# commit, the PR description as its notes, and the AAR attached for builds
+# that cannot reach Maven Central. The AAR is downloaded from Maven Central and
+# checked against Maven Central's own checksum, so what customers download is
+# provably the published artifact. Release assets are the only copy: an AAR
+# once sat at the repository root as "the latest" and went three releases
+# without being updated.
+#
+# If a run fails after the merge, fix the cause and re-run it from the Actions
+# tab. It reads the description when it runs, so an edited one is picked up.
+name: Release
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, closed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Check the release PR
+    # Only our own release branches: while open, and on close only a merge.
+    if: >-
+      startsWith(github.head_ref, 'release/') &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      (github.event.action == 'closed' && github.event.pull_request.merged ||
+       github.event.action != 'closed' && github.event.pull_request.state == 'open')
+    # Each edit or push starts a new check, which replaces one still waiting
+    # for Maven Central. The check before a release is never cancelled.
+    concurrency:
+      group: check-${{ github.event.pull_request.number }}-${{ github.event.action == 'closed' && 'merged' || 'open' }}
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.merged && github.event.pull_request.merge_commit_sha || github.event.pull_request.head.sha }}
+
+      - name: Read the version from the branch name
+        id: version
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          VERSION="${HEAD_REF#release/}"
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::'$HEAD_REF' does not name a version. Release branches are release/<major>.<minor>.<patch>."
+            exit 1
+          fi
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            echo "::error::Release $VERSION already exists."
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Check the README installs it
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if ! grep -q "insurely-android-sdk:$VERSION\"" README.md; then
+            echo "::error::README.md does not install $VERSION. Update its implementation(...) line."
+            exit 1
+          fi
+
+      - name: Check Maven Central serves it
+        # Merging puts the README on main, telling customers to install this
+        # version, so it must exist first. After the merge, the release job
+        # waits for it instead: by then the PR can't be held back.
+        if: github.event.action != 'closed'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        #
+        # It appears about twenty minutes after the SDK repository publishes
+        # it, so this waits up to 30.
+        run: |
+          URL="https://repo1.maven.org/maven2/com/insurely/insurely-android-sdk/$VERSION/"
+          for i in $(seq 1 60); do
+            if curl -sfI "$URL" >/dev/null 2>&1; then
+              echo "Available after ~$(( (i - 1) * 30 ))s."
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "::error::$VERSION is not on Maven Central after 30 minutes, so the README would install a version that doesn't exist."
+          echo "::error::Check that the SDK repository's publish finished, then re-run this check."
+          exit 1
+
+      - name: Check the description has release notes
+        # Read when the job runs rather than from the event, so re-running a
+        # failed release after editing the description picks the edit up.
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if [ -z "$(gh pr view "$PR_NUMBER" --json body --jq .body | tr -d '[:space:]')" ]; then
+            echo "::error::The PR description is empty, and it is the release notes."
+            exit 1
+          fi
+
+  release:
+    name: Release
+    needs: check
+    if: github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      VERSION: ${{ needs.check.outputs.version }}
+    steps:
+      - name: Wait for Maven Central to serve it
+        # The PR check has normally seen it already. This rides out a brief
+        # outage, or a merge that went past a red check.
+        run: |
+          URL="https://repo1.maven.org/maven2/com/insurely/insurely-android-sdk/$VERSION/"
+          for i in $(seq 1 20); do
+            if curl -sfI "$URL" >/dev/null 2>&1; then
+              echo "Available after ~$(( (i - 1) * 30 ))s."
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "::error::$VERSION is not on Maven Central after 10 minutes."
+          echo "::error::Check that the SDK repository's publish workflow ran, then re-run this one."
+          exit 1
+
+      - name: Download the AAR and check it is the published one
+        run: |
+          BASE="https://repo1.maven.org/maven2/com/insurely/insurely-android-sdk/$VERSION/insurely-android-sdk-$VERSION"
+          curl -sfL "$BASE.aar" -o "$RUNNER_TEMP/InsurelySDK-release.aar"
+          EXPECTED="$(curl -sfL "$BASE.aar.sha1" | cut -c1-40)"
+          ACTUAL="$(sha1sum "$RUNNER_TEMP/InsurelySDK-release.aar" | cut -c1-40)"
+          if [ -z "$EXPECTED" ] || [ "$EXPECTED" != "$ACTUAL" ]; then
+            echo "::error::The downloaded AAR's sha1 ($ACTUAL) does not match Maven Central's ($EXPECTED)."
+            exit 1
+          fi
+          echo "sha1 $ACTUAL matches Maven Central."
+
+      - name: Create the release
+        env:
+          MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh pr view "$PR_NUMBER" --json body --jq .body > "$RUNNER_TEMP/notes.md"
+          gh release create "$VERSION" "$RUNNER_TEMP/InsurelySDK-release.aar" \
+            --target "$MERGE_SHA" \
+            --title "$VERSION" \
+            --notes-file "$RUNNER_TEMP/notes.md"
+          echo "Released [$VERSION]($(gh release view "$VERSION" --json url --jq .url))." >> "$GITHUB_STEP_SUMMARY"
