@@ -7,8 +7,9 @@
 # the README. Its description is the release notes.
 #
 # While the PR is open, a check fails if the branch does not name a new
-# version, the README does not install it, Maven Central does not serve it
-# yet, or the description is empty. Make the check required in the branch
+# version, the README does not install it, Maven Central has not served it
+# within 30 minutes, or the description is empty. It waits for Maven Central,
+# so the PR can be opened as soon as the SDK repository has published. Make the check required in the branch
 # rules, so a red one blocks the merge.
 #
 # On merge, this creates the release: the version as its tag, on the merge
@@ -34,11 +35,17 @@ permissions:
 jobs:
   check:
     name: Check the release PR
-    # Only our own release branches, and on close only a merge.
+    # Only our own release branches: while open, and on close only a merge.
     if: >-
       startsWith(github.head_ref, 'release/') &&
       github.event.pull_request.head.repo.full_name == github.repository &&
-      (github.event.action != 'closed' || github.event.pull_request.merged)
+      (github.event.action == 'closed' && github.event.pull_request.merged ||
+       github.event.action != 'closed' && github.event.pull_request.state == 'open')
+    # Each edit or push starts a new check, which replaces one still waiting
+    # for Maven Central. The check before a release is never cancelled.
+    concurrency:
+      group: check-${{ github.event.pull_request.number }}-${{ github.event.action == 'closed' && 'merged' || 'open' }}
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -85,12 +92,21 @@ jobs:
         if: github.event.action != 'closed'
         env:
           VERSION: ${{ steps.version.outputs.version }}
+        #
+        # It appears about twenty minutes after the SDK repository publishes
+        # it, so this waits up to 30.
         run: |
-          if ! curl -sfI "https://repo1.maven.org/maven2/com/insurely/insurely-android-sdk/$VERSION/" >/dev/null 2>&1; then
-            echo "::error::$VERSION is not on Maven Central yet, so the README would install a version that doesn't exist."
-            echo "::error::It appears about twenty minutes after the SDK repository publishes it. Re-run this check then."
-            exit 1
-          fi
+          URL="https://repo1.maven.org/maven2/com/insurely/insurely-android-sdk/$VERSION/"
+          for i in $(seq 1 60); do
+            if curl -sfI "$URL" >/dev/null 2>&1; then
+              echo "Available after ~$(( (i - 1) * 30 ))s."
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "::error::$VERSION is not on Maven Central after 30 minutes, so the README would install a version that doesn't exist."
+          echo "::error::Check that the SDK repository's publish finished, then re-run this check."
+          exit 1
 
       - name: Check the description has release notes
         # Read when the job runs rather than from the event, so re-running a
@@ -117,18 +133,18 @@ jobs:
       VERSION: ${{ needs.check.outputs.version }}
     steps:
       - name: Wait for Maven Central to serve it
-        # repo1.maven.org serves a version around twenty minutes after the SDK
-        # repository publishes it, and the PR may be merged before then.
+        # The PR check has normally seen it already. This rides out a brief
+        # outage, or a merge that went past a red check.
         run: |
           URL="https://repo1.maven.org/maven2/com/insurely/insurely-android-sdk/$VERSION/"
-          for i in $(seq 1 120); do
+          for i in $(seq 1 20); do
             if curl -sfI "$URL" >/dev/null 2>&1; then
               echo "Available after ~$(( (i - 1) * 30 ))s."
               exit 0
             fi
             sleep 30
           done
-          echo "::error::$VERSION is not on Maven Central after an hour."
+          echo "::error::$VERSION is not on Maven Central after 10 minutes."
           echo "::error::Check that the SDK repository's publish workflow ran, then re-run this one."
           exit 1
 
