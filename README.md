@@ -23,7 +23,7 @@ and audit it, under the terms of your agreement with Insurely AB. See `LICENSE`.
 
 ```kotlin
 dependencies {
-    implementation("com.insurely:insurely-android-sdk:3.0.0")
+    implementation("com.insurely:insurely-android-sdk:3.1.0")
 }
 ```
 
@@ -186,6 +186,23 @@ InsurelyView(
 ```
 
 A token that changes before the module has finished loading is held and delivered once it has loaded. Every other setting applies only when the view is created. The SDK never writes the token to Logcat.
+
+## BankID on another device only
+
+Since 3.1.0, set `forceOtherDeviceBankId` on `InsurelyDataAggregation` to offer only "BankID on other device" and hide "BankID on this device":
+
+```kotlin
+import com.insurely.blocks.sdk.config.InsurelyConfig
+import com.insurely.blocks.sdk.config.InsurelyDataAggregation
+
+InsurelyConfig(
+    customerId = "...",
+    configName = "...",
+    dataAggregation = InsurelyDataAggregation(forceOtherDeviceBankId = true),
+)
+```
+
+It applies to companies that support BankID on another device, on both the single-company and the multi-select BankID screens. Companies that only support BankID on the same device, or other login methods, are unchanged. It is off by default.
 
 ## Logging and debugging
 
